@@ -2,3 +2,6 @@ env
 .env
 *.sqlite3
 service_center/__pycache__
+orders/__pycache__
+orders/default_data.json
+orders/migrations/__pycache__
