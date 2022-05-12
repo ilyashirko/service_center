@@ -5,3 +5,4 @@ service_center/__pycache__
 orders/__pycache__
 orders/default_data.json
 orders/migrations/__pycache__
+orders/management/commands/__pycache__

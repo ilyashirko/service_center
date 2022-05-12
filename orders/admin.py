@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Customer, Device, DeviceType, Feedback, Master, Order,
+from .models import (Customer, Device, DeviceType, Feedback, Master, Message, Order, Request,
                      TelegramId)
 
 
@@ -36,4 +36,12 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(TelegramId)
 class TelegramIdAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(Request)
+class RequestAdmin(admin.ModelAdmin):
+    list_display = ('uuid', 'first_name', 'phone', 'created_at')
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
     pass

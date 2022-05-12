@@ -19,10 +19,52 @@ class Master(models.Model):
     patronymic  = models.CharField("Отчество", max_length=20)
     phonenumber = PhoneNumberField("Номер телефона")
     photo = models.ImageField("Фото", blank=True)
-
+    telegram_id = models.ForeignKey(
+        "TelegramId",
+        on_delete=models.PROTECT,
+        verbose_name="Telegram ID",
+        related_name="master",
+        null=True,
+        blank=True
+    )
     def __str__(self):
         return f'{self.last_name} {self.first_name}'
-    
+
+
+class Request(models.Model):
+    uuid = models.CharField(
+        "id",
+        unique=True,
+        default=uuid.uuid1,
+        max_length=36,
+        validators=[MinLengthValidator(36)],
+        primary_key=True,
+        editable=False
+    )
+    user_telegram_id = models.ForeignKey(
+        "TelegramId",
+        on_delete=models.PROTECT,
+        verbose_name="Telegram ID",
+        related_name="requests",
+        null=True,
+        blank=True
+    )
+    request = models.CharField(
+        "Сообщение от пользователя",
+        max_length=1000
+    )
+    phone = PhoneNumberField("Номер телефона")
+    user_name = models.CharField("TG username", max_length=50, null=True, blank=True)
+    first_name = models.CharField("TG first name", max_length=50, null=True, blank=True)
+    created_at = models.DateTimeField(
+        "Сформирован",
+        auto_now_add=True,
+        editable=False
+    )
+
+    def __str__(self):
+        return f'[{self.created_at}]: {self.user_name} ({self.phone}) - {self.request}'
+
 
 class Customer(models.Model):
     uuid = models.CharField(
@@ -43,16 +85,14 @@ class Customer(models.Model):
 
     mail = models.EmailField("Электронная почта", blank=True)
 
-    devices = models.ForeignKey(
+    devices = models.ManyToManyField(
         "Device",
-        on_delete=models.PROTECT,
         verbose_name="Устройства",
         related_name="owner",
-        null=True,
         blank=True
     )
 
-    feedbacks = models.ForeignKey(
+    feedbacks = models.OneToOneField(
         "Feedback",
         on_delete=models.PROTECT,
         verbose_name="Отзывы",
@@ -192,14 +232,38 @@ class Feedback(models.Model):
 
     text = models.TextField(
         "Текст отзыва",
-        max_length=2000
+        max_length=500
     )
 
+    response = models.TextField(
+        "Ответ от администратора",
+        max_length=500,
+        null=True,
+        blank=True
+    )
     created_at = models.DateField(
         "Дата отзыва",
-        auto_now_add=True
+        auto_now_add=True,
+        editable=False
     )
 
 
 class TelegramId(models.Model):
     telegram_id = models.SmallIntegerField("Telegram ID")
+
+class Message(models.Model):
+    text = models.CharField("Сообщение", max_length=1000)
+    request = models.ForeignKey(
+        'Request',
+        verbose_name="Переписка",
+        related_name="messages",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    ) 
+    created_at = models.DateTimeField(
+        "Отправлено",
+        auto_now_add=True,
+        editable=False
+    )
+    is_master = models.BooleanField("Сообщение от мастера", default=None, null=True)
