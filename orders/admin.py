@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Customer, Device, DeviceType, Feedback, Master, Message, Order, Request,
+from .models import (Customer, Device, DeviceType, Feedback, Master, Message, Order, Request, Support,
                      TelegramId)
 
 
@@ -44,4 +44,8 @@ class RequestAdmin(admin.ModelAdmin):
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(Support)
+class SupportAdmin(admin.ModelAdmin):
     pass

@@ -1,11 +1,18 @@
 from ast import Return
-from orders.models import DeviceType, Message, Request, TelegramId
+from orders.models import DeviceType, Message, Request, Support, TelegramId
 from asgiref.sync import sync_to_async
+from textwrap import dedent
+
+
+@sync_to_async
+def get_telegram_object(telegram_id):
+    return TelegramId.objects.get(telegram_id=telegram_id)
 
 
 @sync_to_async
 def get_devices_types():
     return [type.title for type in DeviceType.objects.all()]
+
 
 @sync_to_async
 def get_telegram_id_from_request(uuid):
@@ -16,6 +23,13 @@ def get_telegram_id_from_request(uuid):
 def get_request(uuid):
     return Request.objects.get(uuid=uuid)
 
+@sync_to_async
+def get_support_request(uuid):
+    return Support.objects.get(uuid=uuid)
+
+@sync_to_async
+def get_telegram_id_from_foreignkey(parent_object):
+    return parent_object.telegram_id
 
 @sync_to_async
 def add_message(uuid: str, message: str, is_master: bool):
@@ -28,15 +42,26 @@ def add_message(uuid: str, message: str, is_master: bool):
     Me.save()
 
 @sync_to_async
-def get_last_three_messages(uuid):
+def create_support_request(user_id: int, message: str):
+    telegram_id = TelegramId.objects.get(telegram_id=user_id)
+    new_support_request = Support.objects.create(
+        telegram_id=telegram_id,
+        text=message,
+        is_actual=True
+    )
+    return new_support_request
+
+@sync_to_async
+def get_last_messages(uuid, number):
     request = Request.objects.get(uuid=uuid)
-    messages = Message.objects.filter(request=request).order_by('-created_at')[:3]
-    text = ''
+    messages = Message.objects.filter(request=request).order_by('-created_at')[:number]
+    
+    text = str()
     for message in reversed(messages):
         if message.is_master:
-            text += f'\n[MASTER]: "{message.text}"\n'
+            text += f'[MASTER]: "{message.text}"\n'
         else:
-            text += f'\n[CUSTOMER]: "{message.text}"\n'
+            text += f'[CUSTOMER]: "{message.text}"\n'
     return text
 
 @sync_to_async

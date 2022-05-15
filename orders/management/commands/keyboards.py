@@ -9,9 +9,10 @@ ASK_FOR_PHONE_KEYBOARD = ReplyKeyboardMarkup(
 
 
 def main_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     keyboard.add(*(
-        "Узнать стоимость ремонта",        
+        "Узнать стоимость ремонта",
+        "Написать в поддержку"       
     ))
     return keyboard
 

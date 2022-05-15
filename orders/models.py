@@ -1,6 +1,7 @@
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
 import uuid
+import datetime
 from django.core.validators import MinLengthValidator
 
 
@@ -63,7 +64,7 @@ class Request(models.Model):
     )
 
     def __str__(self):
-        return f'[{self.created_at}]: {self.user_name} ({self.phone}) - {self.request}'
+        return f"[{datetime.datetime.strftime(self.created_at, '%Y-%m-%d %H:%m')}]: {self.user_name} ({self.phone}) - {self.request}"
 
 
 class Customer(models.Model):
@@ -249,7 +250,7 @@ class Feedback(models.Model):
 
 
 class TelegramId(models.Model):
-    telegram_id = models.SmallIntegerField("Telegram ID")
+    telegram_id = models.SmallIntegerField("Telegram ID", unique=True)
 
 class Message(models.Model):
     text = models.CharField("Сообщение", max_length=1000)
@@ -267,3 +268,28 @@ class Message(models.Model):
         editable=False
     )
     is_master = models.BooleanField("Сообщение от мастера", default=None, null=True)
+
+
+class Support(models.Model):
+    uuid = models.CharField(
+        "id",
+        unique=True,
+        default=uuid.uuid1,
+        max_length=36,
+        validators=[MinLengthValidator(36)],
+        primary_key=True,
+        editable=False
+    )
+    telegram_id = models.ForeignKey(
+        "TelegramId",
+        on_delete=models.PROTECT,
+        verbose_name="Telegram ID",
+        related_name="support"
+    )
+    text = models.CharField("Сообщение", max_length=1000)
+    created_at = models.DateTimeField(
+        "Отправлено",
+        auto_now_add=True,
+        editable=False
+    )
+    is_actual = models.BooleanField("Заявка актуальна")
