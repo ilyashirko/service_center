@@ -28,8 +28,17 @@ def get_support_request(uuid):
     return Support.objects.get(uuid=uuid)
 
 @sync_to_async
+def close_support_request(uuid, response):
+    support_request = Support.objects.get(uuid=uuid)
+    support_request.response = response
+    support_request.processed = True
+    support_request.save()
+
+@sync_to_async
 def get_telegram_id_from_foreignkey(parent_object):
     return parent_object.telegram_id
+
+
 
 @sync_to_async
 def add_message(uuid: str, message: str, is_master: bool):
@@ -46,8 +55,8 @@ def create_support_request(user_id: int, message: str):
     telegram_id = TelegramId.objects.get(telegram_id=user_id)
     new_support_request = Support.objects.create(
         telegram_id=telegram_id,
-        text=message,
-        is_actual=True
+        request=message,
+        processed=False
     )
     return new_support_request
 
@@ -76,7 +85,9 @@ def create_new_request(user_telegram_id,
         request=message,
         phone=phone,
         user_name=user_name,
-        first_name=first_name
+        first_name=first_name,
+        master=None,
+        processed=False
     )
     new_request.save()
     return new_request

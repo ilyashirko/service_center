@@ -17,7 +17,7 @@ from orders.management.commands.messages import (ASK_FOR_PHONE,
                                                  HELLO_MESSAGE,
                                                  REQUEST_CONFIRM, SUPPORT_REQUEST)
 
-from .db_processing import (add_message, create_new_request, create_support_request, get_devices_types,
+from .db_processing import (add_message, close_support_request, create_new_request, create_support_request, get_devices_types,
                             get_last_messages, get_request, get_support_request, get_telegram_id_from_foreignkey,
                             get_telegram_id_from_request, get_telegram_object)
 from .keyboards import (ASK_FOR_PHONE_KEYBOARD, main_keyboard,
@@ -38,6 +38,7 @@ class Support(StatesGroup):
     user_id = State()
     message = State()
     response = State()
+    uuid = State()
 
 
 
@@ -132,7 +133,7 @@ class Command(BaseCommand):
                         callback_data=order_callback.new(
                             key='request_response',
                             uuid=request.uuid
-                        )
+                        ),
                     )
                 )
             )
@@ -333,7 +334,8 @@ class Command(BaseCommand):
             telegram_object = await get_telegram_id_from_foreignkey(support_request)
             
             await state.update_data(user_id=telegram_object.telegram_id)
-            await state.update_data(message=support_request.text)
+            await state.update_data(message=support_request.request)
+            await state.update_data(uuid=callback_data['uuid'])
             await bot.send_message(
                 callback_query.from_user.id,
                 text='Напишите ответ пользователю',
@@ -347,7 +349,6 @@ class Command(BaseCommand):
             support_info = await state.get_data()
             user_id = support_info['user_id']
             original_message = support_info['message']
-            
             await bot.send_message(
                 user_id,
                 text=(
@@ -357,6 +358,7 @@ class Command(BaseCommand):
                     f'{message.text}'
                 )
             )
+            await close_support_request(support_info['uuid'], message.text)
             await state.finish()
             
 

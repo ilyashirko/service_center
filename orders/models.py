@@ -57,11 +57,19 @@ class Request(models.Model):
     phone = PhoneNumberField("Номер телефона")
     user_name = models.CharField("TG username", max_length=50, null=True, blank=True)
     first_name = models.CharField("TG first name", max_length=50, null=True, blank=True)
+    master = models.ForeignKey(
+        "Master",
+        on_delete=models.SET_DEFAULT,
+        default=None,
+        related_name='requests',
+        null=True
+    )
     created_at = models.DateTimeField(
         "Сформирован",
         auto_now_add=True,
         editable=False
     )
+    processed = models.BooleanField("Заявка отработана", default=False)
 
     def __str__(self):
         return f"[{datetime.datetime.strftime(self.created_at, '%Y-%m-%d %H:%m')}]: {self.user_name} ({self.phone}) - {self.request}"
@@ -252,6 +260,9 @@ class Feedback(models.Model):
 class TelegramId(models.Model):
     telegram_id = models.SmallIntegerField("Telegram ID", unique=True)
 
+    def __str__(self):
+        return str(self.telegram_id)
+
 class Message(models.Model):
     text = models.CharField("Сообщение", max_length=1000)
     request = models.ForeignKey(
@@ -286,10 +297,11 @@ class Support(models.Model):
         verbose_name="Telegram ID",
         related_name="support"
     )
-    text = models.CharField("Сообщение", max_length=1000)
+    request = models.CharField("Сообщение", max_length=1000)
+    response = models.CharField("Ответ", max_length=1000, blank=True)
     created_at = models.DateTimeField(
         "Отправлено",
         auto_now_add=True,
         editable=False
     )
-    is_actual = models.BooleanField("Заявка актуальна")
+    processed = models.BooleanField("Заявка отработана")

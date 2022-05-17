@@ -40,12 +40,12 @@ class TelegramIdAdmin(admin.ModelAdmin):
 
 @admin.register(Request)
 class RequestAdmin(admin.ModelAdmin):
-    list_display = ('uuid', 'first_name', 'phone', 'created_at')
+    list_display = ('uuid', 'first_name', 'user_name', 'phone', 'created_at', 'processed', 'request')
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('request', 'is_master', 'text')
 
 @admin.register(Support)
 class SupportAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('created_at', 'telegram_id', 'processed', 'request', 'response')
