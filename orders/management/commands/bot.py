@@ -1,6 +1,6 @@
 from textwrap import dedent, indent
-import requests
 
+import requests
 from aiogram import Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -13,12 +13,20 @@ from asgiref.sync import sync_to_async
 from django.core.management.base import BaseCommand
 from environs import Env
 from orders.management.commands.messages import (ASK_FOR_PHONE,
-                                                 CHECK_PRICE_MESSAGE, HELLO_AGAIN_MESSAGE,
+                                                 CHECK_PRICE_MESSAGE,
+                                                 HELLO_AGAIN_MESSAGE,
                                                  HELLO_MESSAGE,
-                                                 REQUEST_CONFIRM, SUPPORT_REQUEST)
+                                                 REQUEST_CONFIRM,
+                                                 SUPPORT_REQUEST)
+from orders.models import Request
 
-from .db_processing import (add_message, close_support_request, create_new_request, create_support_request, get_devices_types,
-                            get_last_messages, get_request, get_support_request, get_telegram_id_from_foreignkey,
+from .db_processing import (add_message, assign_master_for_request,
+                            close_support_request, create_new_request,
+                            create_support_request, get_devices_types,
+                            get_last_messages, get_master_id_from_request,
+                            get_masters_first_last_names, get_request,
+                            get_support_request,
+                            get_telegram_id_from_foreignkey,
                             get_telegram_id_from_request, get_telegram_object)
 from .keyboards import (ASK_FOR_PHONE_KEYBOARD, main_keyboard,
                         make_reply_keyboard)
@@ -32,6 +40,7 @@ class RequestInfo(StatesGroup):
     uuid = State()
     message = State()
     detailes_ask = State()
+    master = State()
 
 class Support(StatesGroup):
     message = State()
@@ -133,7 +142,14 @@ class Command(BaseCommand):
                         callback_data=order_callback.new(
                             key='request_response',
                             uuid=request.uuid
-                        ),
+                        )
+                    ),
+                    InlineKeyboardButton(
+                        text="Назначить мастера",
+                        callback_data=order_callback.new(
+                            key='assign_master',
+                            uuid=request.uuid
+                        )
                     )
                 )
             )
@@ -154,6 +170,58 @@ class Command(BaseCommand):
             )
             await CheckPrice.phone.set()
 
+        @dp.callback_query_handler(order_callback.filter(key='assign_master'))
+        async def callback_assign_master(callback_query: CallbackQuery,
+                                   callback_data: dict,
+                                   state: FSMContext = RequestInfo):
+            masters = await get_masters_first_last_names()
+            await state.update_data(uuid=callback_data['uuid'])
+            await bot.send_message(
+                env.int('ADMIN_TELEGRAM_ID'),
+                text="Какого мастера назначить на данную заявку?",
+                reply_markup=make_reply_keyboard(masters, row_width=1)
+            )
+            await RequestInfo.master.set()
+
+
+        @dp.message_handler(state=RequestInfo.master)
+        async def assign_master(message: Message, state: FSMContext):
+            request_info = await state.get_data()
+            uuid = request_info['uuid']
+            master_id = await assign_master_for_request(uuid, message.text)
+            if not master_id:
+                await message.answer(
+                    "Мастер не назначен, проверьте код",
+                    reply_markup=main_keyboard()
+                )
+                return
+            request = await get_request(uuid)
+            await bot.send_message(
+                master_id,
+                text=(
+                    f'Вам назначена заявка на ремонт!\n\n'
+                    f'Клиент: {request.user_name} ({request.first_name})\n\n'
+                    f'Первичное сообщение:\n'
+                    f'{request.request}\n\n'
+                    f'История переписки:\n'
+                    f'{await get_last_messages(uuid)}'
+                ),
+                reply_markup=InlineKeyboardMarkup(row_width=1).add(
+                    InlineKeyboardButton(
+                        text="Ответить клиенту",
+                        callback_data=order_callback.new(
+                            key='request_response',
+                            uuid=request.uuid
+                        )
+                    )
+                )
+            )
+            await state.finish()
+            await message.answer(
+                f"На заявку\n{request}\nназначен {message.text}",
+                reply_markup=main_keyboard()
+            )
+            
         
         @dp.callback_query_handler(order_callback.filter(key='request_response'))
         async def request_response(callback_query: CallbackQuery,
@@ -222,9 +290,13 @@ class Command(BaseCommand):
             uuid = request_info['uuid']
             user_telegram_id = await get_telegram_id_from_request(uuid)
             request = await get_request(uuid)
+            
+            master_id = await get_master_id_from_request(uuid)
+            if not master_id:
+                master_id = env.int('ADMIN_TELEGRAM_ID')
             extra = await get_last_messages(uuid, 3)
             await bot.send_message(
-                env.int('ADMIN_TELEGRAM_ID'),
+                master_id,
                 text=(
                     f'Сообщение от клиента!\n\n'
 
@@ -240,6 +312,13 @@ class Command(BaseCommand):
                         text="Ответить клиенту",
                         callback_data=order_callback.new(
                             key='request_response',
+                            uuid=request.uuid
+                        )
+                    ),
+                    InlineKeyboardButton(
+                        text="Назначить мастера",
+                        callback_data=order_callback.new(
+                            key='assign_master',
                             uuid=request.uuid
                         )
                     )
@@ -263,12 +342,16 @@ class Command(BaseCommand):
                                 callback_data: dict,
                                 state: FSMContext = RequestInfo):
             request = await get_request(callback_data['uuid'])
+            if request.master:
+                master_id = await get_master_id_from_request(callback_data['uuid'])
+            else:
+                master_id = env.int('ADMIN_TELEGRAM_ID')
             await bot.send_message(
-                env.int('ADMIN_TELEGRAM_ID'),
+                master_id,
                 text="Клиент запросил обратный звонок!"
             )
             await bot.send_contact(
-                env.int('ADMIN_TELEGRAM_ID'),
+                master_id,
                 phone_number=f'+{request.phone}',
                 first_name=request.first_name,
             )

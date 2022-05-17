@@ -8,3 +8,4 @@ orders/migrations/__pycache__
 orders/management/commands/__pycache__
 .vscode
 test.py
+media

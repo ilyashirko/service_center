@@ -1,7 +1,12 @@
 from ast import Return
-from orders.models import DeviceType, Message, Request, Support, TelegramId
+from orders.models import DeviceType, Master, Message, Request, Support, TelegramId
 from asgiref.sync import sync_to_async
 from textwrap import dedent
+
+
+@sync_to_async
+def get_masters_first_last_names():
+    return [f'{master.last_name} {master.first_name}' for master in Master.objects.all()]
 
 
 @sync_to_async
@@ -20,8 +25,23 @@ def get_telegram_id_from_request(uuid):
 
 
 @sync_to_async
+def get_master_id_from_request(uuid):
+    master = Request.objects.get(uuid=uuid).master
+    if master:
+        return Request.objects.get(uuid=uuid).master.telegram_id.telegram_id
+
+@sync_to_async
 def get_request(uuid):
     return Request.objects.get(uuid=uuid)
+
+@sync_to_async
+def assign_master_for_request(uuid, master_name):
+    request = Request.objects.get(uuid=uuid)
+    last_name, first_name = master_name.split(' ')
+    master = Master.objects.get(first_name=first_name, last_name=last_name)
+    request.master = master
+    request.save()
+    return request.master.telegram_id.telegram_id
 
 @sync_to_async
 def get_support_request(uuid):
@@ -61,10 +81,12 @@ def create_support_request(user_id: int, message: str):
     return new_support_request
 
 @sync_to_async
-def get_last_messages(uuid, number):
+def get_last_messages(uuid, number = None):
     request = Request.objects.get(uuid=uuid)
-    messages = Message.objects.filter(request=request).order_by('-created_at')[:number]
-    
+    if number:
+        messages = Message.objects.filter(request=request).order_by('-created_at')[:number]
+    else:
+        messages = Message.objects.filter(request=request).order_by('-created_at')
     text = str()
     for message in reversed(messages):
         if message.is_master:

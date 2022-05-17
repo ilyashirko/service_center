@@ -62,7 +62,8 @@ class Request(models.Model):
         on_delete=models.SET_DEFAULT,
         default=None,
         related_name='requests',
-        null=True
+        null=True,
+        blank=True
     )
     created_at = models.DateTimeField(
         "Сформирован",
