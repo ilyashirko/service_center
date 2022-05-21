@@ -1,7 +1,7 @@
 # Application for getting and working with orders in service center
 
 Based on:  
-Telegram bot (aiogram) as frontend
+Telegram bot (aiogram) as frontend  
 Django framework as backend
 
 # Project objectives
