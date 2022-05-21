@@ -221,7 +221,7 @@ class Command(BaseCommand):
                 return
 
             request = await get_request(uuid)
-            
+
             inline_buttons = [
                 InlineKeyboardButton(
                     text="Ответить клиенту",
@@ -382,6 +382,7 @@ class Command(BaseCommand):
                     f'\nСообщение: {message.text}'
                 ),
                 reply_markup=InlineKeyboardMarkup(row_width=1).add(*inline_buttons)
+            )
             await add_message(uuid, message.text, False)
             await message.answer(
                 dedent(
