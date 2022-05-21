@@ -219,7 +219,37 @@ class Command(BaseCommand):
                     reply_markup=main_keyboard()
                 )
                 return
+
             request = await get_request(uuid)
+            
+            inline_buttons = [
+                InlineKeyboardButton(
+                    text="Ответить клиенту",
+                    callback_data=order_callback.new(
+                        key='request_response',
+                        uuid=request.uuid
+                    )
+                ),
+                InlineKeyboardButton(
+                    text="Позвонить клиенту",
+                    callback_data=order_callback.new(
+                        key='phonecall',
+                        uuid=request.uuid
+                    )
+                )
+            ]
+            if master_id == env.int("ADMIN_TELEGRAM_ID"):
+                inline_buttons.append(
+                    InlineKeyboardButton(
+                        text="Назначить мастера",
+                        callback_data=order_callback.new(
+                            key='assign_master',
+                            uuid=request.uuid
+                        )
+                    )
+                )
+            
+            
 
             await bot.send_message(
                 master_id,
@@ -231,30 +261,7 @@ class Command(BaseCommand):
                     f'История переписки:\n'
                     f'{await get_last_messages(uuid)}'
                 ),
-                reply_markup=InlineKeyboardMarkup(row_width=1).add(
-                    InlineKeyboardButton(
-                        text="Ответить клиенту",
-                        callback_data=order_callback.new(
-                            key='request_response',
-                            uuid=request.uuid
-                        )
-                    ),
-                    
-                    InlineKeyboardButton(
-                        text="Позвонить клиенту",
-                        callback_data=order_callback.new(
-                            key='phonecall',
-                            uuid=request.uuid
-                        )
-                    ),
-                    InlineKeyboardButton(
-                        text="Назначить мастера",
-                        callback_data=order_callback.new(
-                            key='assign_master',
-                            uuid=request.uuid
-                        )
-                    )
-                )
+                reply_markup=InlineKeyboardMarkup(row_width=1).add(*inline_buttons)
             )
             await state.finish()
             await message.answer(
@@ -327,11 +334,38 @@ class Command(BaseCommand):
         async def response_message(message: Message, state: FSMContext):
             request_state_data = await state.get_data()
             uuid = request_state_data['uuid']
-            request_object = await get_request(uuid)
+            request = await get_request(uuid)
             
             master_id = await get_master_id_from_request(uuid)
             if not master_id:
                 master_id = env.int('ADMIN_TELEGRAM_ID')
+            
+            inline_buttons = [
+                InlineKeyboardButton(
+                    text="Ответить клиенту",
+                    callback_data=order_callback.new(
+                        key='request_response',
+                        uuid=request.uuid
+                    )
+                ),
+                InlineKeyboardButton(
+                    text="Позвонить клиенту",
+                    callback_data=order_callback.new(
+                        key='phonecall',
+                        uuid=request.uuid
+                    )
+                )
+            ]
+            if master_id == env.int("ADMIN_TELEGRAM_ID"):
+                inline_buttons.append(
+                    InlineKeyboardButton(
+                        text="Назначить мастера",
+                        callback_data=order_callback.new(
+                            key='assign_master',
+                            uuid=request.uuid
+                        )
+                    )
+                )
 
             last_messages = await get_last_messages(uuid, 3)
 
@@ -340,37 +374,14 @@ class Command(BaseCommand):
                 text=(
                     f'Сообщение от клиента!\n\n'
 
-                    f'Заявка: {request_object}\n\n'
+                    f'Заявка: {request}\n\n'
 
                     f'Последние сообщения:\n'
                     f'{last_messages}'
 
                     f'\nСообщение: {message.text}'
                 ),
-                reply_markup=InlineKeyboardMarkup(row_width=1).add(
-                    InlineKeyboardButton(
-                        text="Ответить клиенту",
-                        callback_data=order_callback.new(
-                            key='request_response',
-                            uuid=request_object.uuid
-                        )
-                    ),
-                    InlineKeyboardButton(
-                        text="Позвонить клиенту",
-                        callback_data=order_callback.new(
-                            key='phonecall',
-                            uuid=request_object.uuid
-                        )
-                    ),
-                    InlineKeyboardButton(
-                        text="Назначить мастера",
-                        callback_data=order_callback.new(
-                            key='assign_master',
-                            uuid=request_object.uuid
-                        )
-                    )
-                )
-            )
+                reply_markup=InlineKeyboardMarkup(row_width=1).add(*inline_buttons)
             await add_message(uuid, message.text, False)
             await message.answer(
                 dedent(
