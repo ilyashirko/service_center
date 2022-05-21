@@ -7,7 +7,7 @@ from textwrap import dedent
 @sync_to_async
 def create_telegram_model(telegram_id):
     return TelegramId.objects.create(
-        telgram_id=telegram_id
+        telegram_id=telegram_id
     )
 
 @sync_to_async
