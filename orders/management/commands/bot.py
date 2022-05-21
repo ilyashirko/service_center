@@ -408,6 +408,11 @@ class Command(BaseCommand):
                 first_name=request_object.first_name,
             )
             user_telegram_id = await get_telegram_id_from_request(callback_data['uuid'])
+            if callback_data['key'] == 'phonecall_ask':
+                await bot.send_message(
+                    user_telegram_id,
+                    text="Ваш номер отправлен мастеру, ожидайте звонка."
+                )
             log.info(f'REQUEST [{request_object.uuid}]: MASTER ({master_id}) GOT PHONENUMBER OF CUSTOMER ({user_telegram_id}): {request_object.phone}')
 
         @dp.message_handler(commands='support')

@@ -41,9 +41,9 @@ ADMIN_TELEGRAM_ID =
 ALLOWED_HOSTS = 
 DEBUG = 
 ```
-`TELEGRAM_BOT_TOKEN` - you can get when you create bot with [BotFather](https://t.me/BotFather)
-`ADMIN_BOT_TOKEN` - second bot only for the most important messages for admin
-`ADMIN_TELEGRAM_ID` - personal telegram id of administrator, person who get new requests from customers
+`TELEGRAM_BOT_TOKEN` - you can get when you create bot with [BotFather](https://t.me/BotFather)  
+`ADMIN_BOT_TOKEN` - second bot only for the most important messages for admin  
+`ADMIN_TELEGRAM_ID` - personal telegram id of administrator, person who get new requests from customers  
 
 Then you should make migrations, create superuser and you can launch app
 ```

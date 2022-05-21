@@ -2,3 +2,6 @@ Django==4.0.4
 django-phonenumber-field==6.1.0
 phonenumbers==8.12.47
 Pillow==9.1.0
+environs==9.5.0
+requests==2.27.1
+aiogram==2.20
