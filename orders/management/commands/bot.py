@@ -24,7 +24,7 @@ from orders.management.commands.messages import (ASK_FOR_PHONE,
 
 from .db_processing import (add_message, assign_master_for_request,
                             close_support_request, create_new_request,
-                            create_support_request, get_last_messages,
+                            create_support_request, create_telegram_model, get_last_messages,
                             get_master_id_from_request,
                             get_masters_first_last_names, get_request,
                             get_support_request,
@@ -97,6 +97,7 @@ class Command(BaseCommand):
                 await message.reply(HELLO_AGAIN_MESSAGE, reply_markup=main_keyboard())
             else:
                 await message.reply(HELLO_MESSAGE, reply_markup=main_keyboard())
+                await create_telegram_model(message.from_user.id)
                 text = dedent(
                     f"""
                     Босс, у нас новый посетитель.

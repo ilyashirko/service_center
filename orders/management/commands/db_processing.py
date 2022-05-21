@@ -5,6 +5,12 @@ from textwrap import dedent
 
 
 @sync_to_async
+def create_telegram_model(telegram_id):
+    return TelegramId.objects.create(
+        telgram_id=telegram_id
+    )
+
+@sync_to_async
 def get_masters_first_last_names():
     return [f'{master.last_name} {master.first_name}' for master in Master.objects.all()]
 
