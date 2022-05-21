@@ -9,3 +9,5 @@ orders/management/commands/__pycache__
 .vscode
 test.py
 media
+*.log
+*.zip

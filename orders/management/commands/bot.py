@@ -1,4 +1,9 @@
-from textwrap import dedent, indent
+import logging
+import time
+import zipfile
+from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
+from textwrap import dedent
 
 import requests
 from aiogram import Bot, Dispatcher, executor
@@ -6,10 +11,8 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, ContentTypes, InlineKeyboardButton,
-                           InlineKeyboardMarkup, Message, ParseMode,
-                           PreCheckoutQuery, ReplyKeyboardRemove)
+                           InlineKeyboardMarkup, InputFile, Message, ParseMode)
 from aiogram.utils.callback_data import CallbackData
-from asgiref.sync import sync_to_async
 from django.core.management.base import BaseCommand
 from environs import Env
 from orders.management.commands.messages import (ASK_FOR_PHONE,
@@ -18,12 +21,11 @@ from orders.management.commands.messages import (ASK_FOR_PHONE,
                                                  HELLO_MESSAGE,
                                                  REQUEST_CONFIRM,
                                                  SUPPORT_REQUEST)
-from orders.models import Request
 
 from .db_processing import (add_message, assign_master_for_request,
                             close_support_request, create_new_request,
-                            create_support_request, get_devices_types,
-                            get_last_messages, get_master_id_from_request,
+                            create_support_request, get_last_messages,
+                            get_master_id_from_request,
                             get_masters_first_last_names, get_request,
                             get_support_request,
                             get_telegram_id_from_foreignkey,
@@ -31,16 +33,24 @@ from .db_processing import (add_message, assign_master_for_request,
 from .keyboards import (ASK_FOR_PHONE_KEYBOARD, main_keyboard,
                         make_reply_keyboard)
 
+LOG_FILENAME = 'log.log'
+
+order_callback = CallbackData("id", "uuid", "key")
+
+support_callback = CallbackData("id", "uuid", "key")
+
 
 class CheckPrice(StatesGroup):
     request = State()
     phone = State()
-    
-class RequestInfo(StatesGroup):
+
+
+class RequestService(StatesGroup):
     uuid = State()
     message = State()
     detailes_ask = State()
     master = State()
+
 
 class Support(StatesGroup):
     message = State()
@@ -50,13 +60,20 @@ class Support(StatesGroup):
     uuid = State()
 
 
-
 class Command(BaseCommand):
     help = "Telegram bot"
 
     def handle(self, *args, **kwargs):
         env = Env()
         env.read_env()
+
+        log = logging.getLogger(LOG_FILENAME)
+        log.setLevel(logging.INFO)
+
+        filehandler = logging.FileHandler(LOG_FILENAME)
+        basic_formater = logging.Formatter('%(asctime)s : [%(levelname)s] : %(message)s')
+        filehandler.setFormatter(basic_formater)
+        log.addHandler(filehandler)
 
         bot = Bot(token=env.str("TELEGRAM_BOT_TOKEN"), parse_mode=ParseMode.HTML)
         storage = MemoryStorage()
@@ -92,6 +109,7 @@ class Command(BaseCommand):
                     f"bot{env.str('ADMIN_BOT_TOKEN')}/sendMessage?"
                     f"chat_id={env.str('ADMIN_TELEGRAM_ID')}&text={text}"
                 )
+                log.info(f"NEW USER - {message.from_user.id}")
 
 
         @dp.message_handler(commands="check_price")
@@ -108,8 +126,6 @@ class Command(BaseCommand):
             await CheckPrice.phone.set()
 
 
-        order_callback = CallbackData("id", "uuid", "key")
-
         @dp.message_handler(state=CheckPrice.phone,
                             content_types=ContentTypes.CONTACT)
         async def check_price_phone(message: Message, state: FSMContext):
@@ -122,7 +138,7 @@ class Command(BaseCommand):
                 first_name=message.from_user.first_name
             )
             await state.finish()
-            
+
             await bot.send_message(
                 env.int('ADMIN_TELEGRAM_ID'),
                 dedent(
@@ -145,6 +161,13 @@ class Command(BaseCommand):
                         )
                     ),
                     InlineKeyboardButton(
+                        text="Позвонить клиенту",
+                        callback_data=order_callback.new(
+                            key='phonecall',
+                            uuid=request.uuid
+                        )
+                    ),
+                    InlineKeyboardButton(
                         text="Назначить мастера",
                         callback_data=order_callback.new(
                             key='assign_master',
@@ -154,8 +177,9 @@ class Command(BaseCommand):
                 )
             )
             await message.answer(REQUEST_CONFIRM, reply_markup=main_keyboard())
+            log.info(f'NEW REQUEST - {request.uuid} | {message.contact.phone_number}')
 
-
+            
         @dp.message_handler(state=CheckPrice.phone)
         async def invalid_number(message: Message, state: FSMContext):
             await message.reply(
@@ -172,8 +196,8 @@ class Command(BaseCommand):
 
         @dp.callback_query_handler(order_callback.filter(key='assign_master'))
         async def callback_assign_master(callback_query: CallbackQuery,
-                                   callback_data: dict,
-                                   state: FSMContext = RequestInfo):
+                                         callback_data: dict,
+                                         state: FSMContext = RequestService):
             masters = await get_masters_first_last_names()
             await state.update_data(uuid=callback_data['uuid'])
             await bot.send_message(
@@ -181,13 +205,13 @@ class Command(BaseCommand):
                 text="Какого мастера назначить на данную заявку?",
                 reply_markup=make_reply_keyboard(masters, row_width=1)
             )
-            await RequestInfo.master.set()
+            await RequestService.master.set()
 
 
-        @dp.message_handler(state=RequestInfo.master)
+        @dp.message_handler(state=RequestService.master)
         async def assign_master(message: Message, state: FSMContext):
-            request_info = await state.get_data()
-            uuid = request_info['uuid']
+            request_state_data = await state.get_data()
+            uuid = request_state_data['uuid']
             master_id = await assign_master_for_request(uuid, message.text)
             if not master_id:
                 await message.answer(
@@ -196,6 +220,7 @@ class Command(BaseCommand):
                 )
                 return
             request = await get_request(uuid)
+
             await bot.send_message(
                 master_id,
                 text=(
@@ -213,6 +238,21 @@ class Command(BaseCommand):
                             key='request_response',
                             uuid=request.uuid
                         )
+                    ),
+                    
+                    InlineKeyboardButton(
+                        text="Позвонить клиенту",
+                        callback_data=order_callback.new(
+                            key='phonecall',
+                            uuid=request.uuid
+                        )
+                    ),
+                    InlineKeyboardButton(
+                        text="Назначить мастера",
+                        callback_data=order_callback.new(
+                            key='assign_master',
+                            uuid=request.uuid
+                        )
                     )
                 )
             )
@@ -221,25 +261,26 @@ class Command(BaseCommand):
                 f"На заявку\n{request}\nназначен {message.text}",
                 reply_markup=main_keyboard()
             )
+            log.info(f'REQUEST ({request.uuid}) - MASTER ASSIGNED ({master_id})')
             
         
         @dp.callback_query_handler(order_callback.filter(key='request_response'))
         async def request_response(callback_query: CallbackQuery,
                                    callback_data: dict,
-                                   state: FSMContext = RequestInfo):
+                                   state: FSMContext = RequestService):
             await state.update_data(uuid=callback_data['uuid'])
             await bot.send_message(
                 callback_query.from_user.id,
                 text='Напишите сообщение для клиента...',
                 reply_markup=make_reply_keyboard()
             )
-            await RequestInfo.message.set()
+            await RequestService.message.set()
 
         
-        @dp.message_handler(state=RequestInfo.message)
+        @dp.message_handler(state=RequestService.message)
         async def response_message(message: Message, state: FSMContext):
-            request_info = await state.get_data()
-            uuid = request_info['uuid']
+            request_state_data = await state.get_data()
+            uuid = request_state_data['uuid']
             user_telegram_id = await get_telegram_id_from_request(uuid)
             request = await get_request(uuid)
             await add_message(uuid, message.text, True)
@@ -249,16 +290,12 @@ class Command(BaseCommand):
                     f"Вам ответил мастер по заказу:\n"
                     f"{request}\n\n"
 
-                    f"Сообщение:\n"
+                    f"Сообщение от мастера:\n"
                     f"{message.text}"
                 ),
                 reply_markup=InlineKeyboardMarkup(row_width=1).add(
                     InlineKeyboardButton(
-                        text="Оформить заявку",
-                        callback_data=order_callback.new(key='make_order', uuid=uuid)
-                    ),
-                    InlineKeyboardButton(
-                        text="Уточнить детали",
+                        text="Написать мастеру",
                         callback_data=order_callback.new(key='details_ask', uuid=uuid)
                     ),
                     InlineKeyboardButton(
@@ -269,41 +306,44 @@ class Command(BaseCommand):
             )
             await state.finish()
             await message.answer("Сообщение отправлено клиенту.", reply_markup=main_keyboard())
+            log_message = " ".join(message.text.split("\n"))
+            log.info(f'REQUEST [{request.uuid}]: MASTER ({message.from_user.id}) SENT MESSAGE TO CUSTOMER ({user_telegram_id}): {log_message}')
         
 
         @dp.callback_query_handler(order_callback.filter(key='details_ask'))
         async def request_response(callback_query: CallbackQuery,
                                    callback_data: dict,
-                                   state: FSMContext = RequestInfo):
+                                   state: FSMContext = RequestService):
             await state.update_data(uuid=callback_data['uuid'])
             await bot.send_message(
                 callback_query.from_user.id,
                 text='Напишите что хотите уточнить.',
                 reply_markup=make_reply_keyboard()
             )
-            await RequestInfo.detailes_ask.set()
+            await RequestService.detailes_ask.set()
 
 
-        @dp.message_handler(state=RequestInfo.detailes_ask)
+        @dp.message_handler(state=RequestService.detailes_ask)
         async def response_message(message: Message, state: FSMContext):
-            request_info = await state.get_data()
-            uuid = request_info['uuid']
-            user_telegram_id = await get_telegram_id_from_request(uuid)
-            request = await get_request(uuid)
+            request_state_data = await state.get_data()
+            uuid = request_state_data['uuid']
+            request_object = await get_request(uuid)
             
             master_id = await get_master_id_from_request(uuid)
             if not master_id:
                 master_id = env.int('ADMIN_TELEGRAM_ID')
-            extra = await get_last_messages(uuid, 3)
+
+            last_messages = await get_last_messages(uuid, 3)
+
             await bot.send_message(
                 master_id,
                 text=(
                     f'Сообщение от клиента!\n\n'
 
-                    f'Заявка: {request}\n\n'
+                    f'Заявка: {request_object}\n\n'
 
                     f'Последние сообщения:\n'
-                    f'{extra}'
+                    f'{last_messages}'
 
                     f'\nСообщение: {message.text}'
                 ),
@@ -312,14 +352,21 @@ class Command(BaseCommand):
                         text="Ответить клиенту",
                         callback_data=order_callback.new(
                             key='request_response',
-                            uuid=request.uuid
+                            uuid=request_object.uuid
+                        )
+                    ),
+                    InlineKeyboardButton(
+                        text="Позвонить клиенту",
+                        callback_data=order_callback.new(
+                            key='phonecall',
+                            uuid=request_object.uuid
                         )
                     ),
                     InlineKeyboardButton(
                         text="Назначить мастера",
                         callback_data=order_callback.new(
                             key='assign_master',
-                            uuid=request.uuid
+                            uuid=request_object.uuid
                         )
                     )
                 )
@@ -335,33 +382,40 @@ class Command(BaseCommand):
                 reply_markup=main_keyboard()
             )
             await state.finish()
+            log_message = " ".join(message.text.split("\n"))
+            log.info(f'REQUEST [{request_object.uuid}]: CUSTOMER ({message.from_user.id}) SENT MESSAGE TO MASTER ({master_id}): {log_message}')
 
 
+        @dp.callback_query_handler(order_callback.filter(key='phonecall'))
         @dp.callback_query_handler(order_callback.filter(key='phonecall_ask'))
         async def phonecall_ask(callback_query: CallbackQuery,
                                 callback_data: dict,
-                                state: FSMContext = RequestInfo):
-            request = await get_request(callback_data['uuid'])
-            if request.master:
-                master_id = await get_master_id_from_request(callback_data['uuid'])
-            else:
+                                state: FSMContext):
+            request_object = await get_request(callback_data['uuid'])
+            
+            master_id = await get_master_id_from_request(callback_data['uuid'])
+            if not master_id:
                 master_id = env.int('ADMIN_TELEGRAM_ID')
-            await bot.send_message(
-                master_id,
-                text="Клиент запросил обратный звонок!"
-            )
+
+            if callback_data['key'] == 'phonecall_ask':
+                await bot.send_message(
+                    master_id,
+                    text="Клиент запросил обратный звонок!"
+                )
             await bot.send_contact(
                 master_id,
-                phone_number=f'+{request.phone}',
-                first_name=request.first_name,
+                phone_number=f'+{request_object.phone}',
+                first_name=request_object.first_name,
             )
+            user_telegram_id = await get_telegram_id_from_request(callback_data['uuid'])
+            log.info(f'REQUEST [{request_object.uuid}]: MASTER ({master_id}) GOT PHONENUMBER OF CUSTOMER ({user_telegram_id}): {request_object.phone}')
 
-        support_callback = CallbackData('id', 'uuid', 'key')
         @dp.message_handler(commands='support')
         @dp.message_handler(lambda message: message.text.lower() == 'написать в поддержку')
         async def support(message: Message):
             await message.reply(SUPPORT_REQUEST, reply_markup=make_reply_keyboard())
             await Support.message.set()
+
 
         @dp.message_handler(state=Support.message)
         async def support_message(message: Message, state: FSMContext):
@@ -376,6 +430,7 @@ class Command(BaseCommand):
                 ))
                 await Support.message.set()
                 return
+
             new_support_request = await create_support_request(message.from_user.id, message.text)
             await bot.send_message(
                 env.int('ADMIN_TELEGRAM_ID'),
@@ -407,6 +462,8 @@ class Command(BaseCommand):
                 ),
                 reply_markup=main_keyboard()
             )
+            log_message = " ".join(message.text.split("\n"))
+            log.info(f'SUPPORT REQUEST [{new_support_request.uuid}] FROM {message.from_user.id}: {log_message}')
         
         
         @dp.callback_query_handler(support_callback.filter(key='support_response'))
@@ -425,13 +482,14 @@ class Command(BaseCommand):
                 reply_markup=make_reply_keyboard()
             )
             await Support.response.set()
+  
 
 
         @dp.message_handler(state=Support.response)
         async def support_response(message: Message, state: FSMContext):
-            support_info = await state.get_data()
-            user_id = support_info['user_id']
-            original_message = support_info['message']
+            support_state_data = await state.get_data()
+            user_id = support_state_data['user_id']
+            original_message = support_state_data['message']
             await bot.send_message(
                 user_id,
                 text=(
@@ -441,18 +499,33 @@ class Command(BaseCommand):
                     f'{message.text}'
                 )
             )
-            await close_support_request(support_info['uuid'], message.text)
+            await close_support_request(support_state_data['uuid'], message.text)
             await state.finish()
-            
+            log_message = " ".join(message.text.split("\n"))
+            log.info(f'SUPPORT REQUEST [{support_state_data.uuid}] CLOSED WITH ANSWER FROM {message.from_user.id}: {log_message}')
+        
 
+        @dp.message_handler(commands="backup")
+        async def backup(message: Message):
+            if message.from_user.id != env.int('ADMIN_TELEGRAM_ID'):
+                await bot.send_message(chat_id=env.int('ADMIN_TELEGRAM_ID'), text=f'ALERT!!!\n\nBACKUP REQUEST FROM {message.from_user.id} user')
+                log.warning(f'BACKUP REQUEST FROM {message.from_user.id} user')
+                return
+            db = zipfile.ZipFile('database.zip', 'w')
+            db.write("db.sqlite3")
+            db.close()
+            await bot.send_document(chat_id=env.int('ADMIN_TELEGRAM_ID'), document=open('database.zip', 'rb'))
+            log.info(f'BACKUP SENT TO {env.int("ADMIN_TELEGRAM_ID")}')
+
+            
+            
         @dp.message_handler()
         async def unknown_message(message: Message):
             await message.reply(
                 dedent(
-                    """Бот не поддерживает произвольные сообщения.
+                    f'Бот не поддерживает произвольные сообщения.\n\n'
                     
-                    Нажмите необходимую кнопку для связи с мастером или поддержкой.
-                    """
+                    f'Нажмите необходимую кнопку для связи с мастером или поддержкой.'
                 )
             )
 

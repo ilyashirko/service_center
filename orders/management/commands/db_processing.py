@@ -11,12 +11,10 @@ def get_masters_first_last_names():
 
 @sync_to_async
 def get_telegram_object(telegram_id):
-    return TelegramId.objects.get(telegram_id=telegram_id)
-
-
-@sync_to_async
-def get_devices_types():
-    return [type.title for type in DeviceType.objects.all()]
+    try:
+        return TelegramId.objects.get(telegram_id=telegram_id)
+    except TelegramId.DoesNotExist:
+        return
 
 
 @sync_to_async
@@ -30,9 +28,11 @@ def get_master_id_from_request(uuid):
     if master:
         return Request.objects.get(uuid=uuid).master.telegram_id.telegram_id
 
+
 @sync_to_async
 def get_request(uuid):
     return Request.objects.get(uuid=uuid)
+
 
 @sync_to_async
 def assign_master_for_request(uuid, master_name):
@@ -43,9 +43,11 @@ def assign_master_for_request(uuid, master_name):
     request.save()
     return request.master.telegram_id.telegram_id
 
+
 @sync_to_async
 def get_support_request(uuid):
     return Support.objects.get(uuid=uuid)
+
 
 @sync_to_async
 def close_support_request(uuid, response):
@@ -54,10 +56,10 @@ def close_support_request(uuid, response):
     support_request.processed = True
     support_request.save()
 
+
 @sync_to_async
 def get_telegram_id_from_foreignkey(parent_object):
     return parent_object.telegram_id
-
 
 
 @sync_to_async
@@ -70,6 +72,7 @@ def add_message(uuid: str, message: str, is_master: bool):
     )
     Me.save()
 
+
 @sync_to_async
 def create_support_request(user_id: int, message: str):
     telegram_id = TelegramId.objects.get(telegram_id=user_id)
@@ -79,6 +82,7 @@ def create_support_request(user_id: int, message: str):
         processed=False
     )
     return new_support_request
+
 
 @sync_to_async
 def get_last_messages(uuid, number = None):
@@ -94,6 +98,7 @@ def get_last_messages(uuid, number = None):
         else:
             text += f'[CUSTOMER]: "{message.text}"\n'
     return text
+
 
 @sync_to_async
 def create_new_request(user_telegram_id,
@@ -113,3 +118,4 @@ def create_new_request(user_telegram_id,
     )
     new_request.save()
     return new_request
+    

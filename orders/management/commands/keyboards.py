@@ -5,7 +5,8 @@ ASK_FOR_PHONE_KEYBOARD = ReplyKeyboardMarkup(
     row_width=1
 ).add(
     KeyboardButton("Отправить номер телефона", request_contact=True),
-    'Вернуться на главную')
+    'Вернуться на главную'
+)
 
 
 def main_keyboard():
@@ -26,9 +27,6 @@ def make_reply_keyboard(buttons: list = [],
         one_time_keyboard=one_time,
         row_width=row_width
     )
-    print(buttons)
-    for button in buttons:
-        print(button)
     keyboard.add(*(buttons + extra_buttons + ['Вернуться на главную']))
     return keyboard
 
