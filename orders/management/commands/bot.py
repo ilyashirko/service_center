@@ -395,7 +395,7 @@ class Command(BaseCommand):
             )
             await state.finish()
             log_message = " ".join(message.text.split("\n"))
-            log.info(f'REQUEST [{request_object.uuid}]: CUSTOMER ({message.from_user.id}) SENT MESSAGE TO MASTER ({master_id}): {log_message}')
+            log.info(f'REQUEST [{request.uuid}]: CUSTOMER ({message.from_user.id}) SENT MESSAGE TO MASTER ({master_id}): {log_message}')
 
 
         @dp.callback_query_handler(order_callback.filter(key='phonecall'))
