@@ -519,7 +519,7 @@ class Command(BaseCommand):
             await close_support_request(support_state_data['uuid'], message.text)
             await state.finish()
             log_message = " ".join(message.text.split("\n"))
-            log.info(f'SUPPORT REQUEST [{support_state_data.uuid}] CLOSED WITH ANSWER FROM {message.from_user.id}: {log_message}')
+            log.info(f'SUPPORT REQUEST [{support_state_data['uuid']}] CLOSED WITH ANSWER FROM {message.from_user.id}: {log_message}')
         
 
         @dp.message_handler(commands="backup")
