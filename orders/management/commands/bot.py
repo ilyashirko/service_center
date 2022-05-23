@@ -18,7 +18,7 @@ from environs import Env
 from orders.management.commands.messages import (ASK_FOR_PHONE,
                                                  CHECK_PRICE_MESSAGE,
                                                  HELLO_AGAIN_MESSAGE,
-                                                 HELLO_MESSAGE,
+                                                 HELLO_MESSAGE, PRIVACY_POLICY_PHONE,
                                                  REQUEST_CONFIRM,
                                                  SUPPORT_REQUEST)
 
@@ -124,8 +124,21 @@ class Command(BaseCommand):
         async def check_price_request(message: Message, state: FSMContext):
             await state.update_data(request=message.text)
             await message.answer(ASK_FOR_PHONE, reply_markup=ASK_FOR_PHONE_KEYBOARD)
+            await message.answer(
+                PRIVACY_POLICY_PHONE,
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("Политика конфиденциальности", callback_data="privacy_policy")
+                )
+            )
             await CheckPrice.phone.set()
 
+        @dp.callback_query_handler(lambda callback: callback.data == "privacy_policy")
+        async def send_privacy_policy(callback_query: CallbackQuery):
+            with open("privacy_policy.pdf", "rb") as privacy_policy:
+                await bot.send_file(
+                    chat_id=callback_query.from_user.id,
+                    file=privacy_policy
+                )
 
         @dp.message_handler(state=CheckPrice.phone,
                             content_types=ContentTypes.CONTACT)
