@@ -132,13 +132,14 @@ class Command(BaseCommand):
             )
             await CheckPrice.phone.set()
 
-        @dp.callback_query_handler(lambda callback: callback.data == "privacy_policy")
-        async def send_privacy_policy(callback_query: CallbackQuery):
+        @dp.callback_query_handler(lambda callback: callback.data == "privacy_policy", state=CheckPrice.phone)
+        async def send_privacy_policy(callback_query: CallbackQuery, state: FSMContext):
             with open("privacy_policy.pdf", "rb") as privacy_policy:
                 await bot.send_file(
                     chat_id=callback_query.from_user.id,
                     file=privacy_policy
                 )
+            await CheckPrice.phone.set()
 
         @dp.message_handler(state=CheckPrice.phone,
                             content_types=ContentTypes.CONTACT)
