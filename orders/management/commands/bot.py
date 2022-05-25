@@ -132,7 +132,7 @@ class Command(BaseCommand):
             )
             await CheckPrice.phone.set()
 
-        @dp.callback_query_handler(lambda callback: callback.data == "privacy_policy", state=CheckPrice.phone)
+        @dp.callback_query_handler(lambda callback: callback.data == "privacy_policy", state="*")
         async def send_privacy_policy(callback_query: CallbackQuery, state: FSMContext):
             with open("privacy_policy.pdf", "rb") as privacy_policy:
                 await bot.send_document(
@@ -547,6 +547,7 @@ class Command(BaseCommand):
             db.write("db.sqlite3")
             db.close()
             await bot.send_document(chat_id=env.int('ADMIN_TELEGRAM_ID'), document=open('database.zip', 'rb'))
+            await bot.send_document(chat_id=env.int('ADMIN_TELEGRAM_ID'), document=open('log.log', 'rb'))
             log.info(f'BACKUP SENT TO {env.int("ADMIN_TELEGRAM_ID")}')
 
             
