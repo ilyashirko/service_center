@@ -18,17 +18,19 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from orders import views
-from orders.serializers import MasterViewSet
+from orders.serializers import MasterViewSet, RequestViewSet
 from rest_framework import routers
 
 router = routers.DefaultRouter()
 router.register('masters', MasterViewSet)
+#router.register('new_request', RequestViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include(router.urls)),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     #path('masters/', views.master_list),
+    path('new_request/', views.create_request),
     path('masters/<str:uuid>/', views.master_detail),
 ]
 urlpatterns += static(

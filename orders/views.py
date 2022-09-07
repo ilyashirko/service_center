@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
-from orders.models import Master
-from orders.serializers import MasterSerializer
+from orders.models import Master, Request
+from orders.serializers import MasterSerializer, RequestSerializer
 
 
 @csrf_exempt
@@ -12,8 +12,8 @@ def master_list(request):
     List all code snippets, or create a new snippet.
     """
     if request.method == 'GET':
-        snippets = Master.objects.all()
-        serializer = MasterSerializer(snippets, many=True)
+        masters = Master.objects.all()
+        serializer = MasterSerializer(masters, many=True)
         return JsonResponse(
             serializer.data,
             safe=False,
@@ -23,13 +23,12 @@ def master_list(request):
             })
 
     elif request.method == 'POST':
-        return JsonResponse(serializer.errors, status=403)
-        # data = JSONParser().parse(request)
-        # serializer = MasterModelSerializer(data=data)
-        # if serializer.is_valid():
-        #     serializer.save()
-        #     return JsonResponse(serializer.data, status=201)
-        # return JsonResponse(serializer.errors, status=400)
+        data = JSONParser().parse(request)
+        serializer = MasterSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
 
 
 @csrf_exempt
@@ -64,3 +63,19 @@ def master_detail(request, uuid):
     # elif request.method == 'DELETE':
     #     master.delete()
     #     return HttpResponse(status=204)
+
+
+@csrf_exempt
+def create_request(request):
+    if request.method == 'GET':
+        return HttpResponse(status=400)
+
+    elif request.method == 'POST':
+        data = JSONParser().parse(request)
+        if not data['processed']:
+            return JsonResponse({'error': 'You cant add False processed requests'}, status=400)
+        serializer = RequestSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)

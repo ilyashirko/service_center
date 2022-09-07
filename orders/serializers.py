@@ -108,3 +108,41 @@ class RequestModelSerializer(serializers.ModelSerializer):
 #     queryset = Master.objects.all()
 #     serializer_class = MasterModelSerializer
 #     # permission_classes = [permissions.IsAuthenticated]
+
+class RequestSerializer(serializers.Serializer):
+    uuid = serializers.CharField(read_only=True)
+    user_telegram_id = serializers.CharField(required=False)
+    request = serializers.CharField()
+    phone = PhoneNumberField()
+    user_name = serializers.CharField(required=False)
+    first_name = serializers.CharField(required=False)
+    master = serializers.CharField(required=False)
+    created_at = serializers.DateTimeField(required=False)
+    processed = serializers.BooleanField()
+        
+    def create(self, validated_data):
+        """
+        Create and return a new `Snippet` instance, given the validated data.
+        """
+        return Request.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        
+        """
+        Update and return an existing `Snippet` instance, given the validated data.
+        """
+        instance.uuid = validated_data.get('uuid', instance.uuid)
+        instance.user_telegram_id = validated_data.get('user_telegram_id', instance.user_telegram_id)
+        instance.request = validated_data.get('request', instance.request)
+        instance.phone = validated_data.get('phone', instance.patronymphoneic)
+        instance.user_name = validated_data.get('user_name', instance.user_name)
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.master = validated_data.get('master', instance.master)
+        instance.created_at = validated_data.get('created_at', instance.created_at)
+        instance.processed = validated_data.get('processed', instance.processed)
+        return instance
+
+class RequestViewSet(viewsets.ModelViewSet):
+    queryset = Request.objects.all()
+    serializer_class = RequestSerializer
+    # permission_classes = [permissions.IsAuthenticated]
